@@ -8,7 +8,11 @@
  *        assistant oauth connect google --scopes <defaults> \
  *          https://www.googleapis.com/auth/youtube.readonly
  *   2. YOUTUBE_API_KEY env var
- *   3. <workspaceDir>/plugins-data/youtube-manager/credentials.json ({ "apiKey": "..." })
+ *   3. Encrypted credential vault: `assistant credentials` under
+ *      service=youtube field=api_key. Never stored in the workspace —
+ *      workspace files end up in backups/sync. A legacy
+ *      plugins-data/youtube-manager/credentials.json, if found, is migrated
+ *      into the vault once and deleted.
  *
  * All tools here are public reads (search, stats, comments). Write operations
  * (updating video metadata, replying to comments) would additionally need the
@@ -67,14 +71,67 @@ const NO_AUTH_MSG =
   "   assistant oauth connect google --scopes <your current scopes> " +
   `${OAUTH_SCOPE}\n` +
   "2. API key — create one at https://console.cloud.google.com (enable 'YouTube " +
-  "Data API v3'), then set YOUTUBE_API_KEY or save it to " +
-  'plugins-data/youtube-manager/credentials.json as {"apiKey": "..."}.';
+  "Data API v3'), then store it in the encrypted vault:\n" +
+  "   assistant credentials prompt --service youtube --field api_key\n" +
+  "   (or set the YOUTUBE_API_KEY env var).";
+
+const CRED_SERVICE = "youtube";
+const CRED_FIELD = "api_key";
+
+function credentialsCli(args: string[], ctx: ToolContext): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = execFile(
+      "assistant",
+      ["credentials", ...args],
+      { timeout: 15_000, maxBuffer: 1024 * 1024 },
+      (err, stdout) => (err ? reject(err) : resolve((stdout ?? "").trim())),
+    );
+    ctx.signal?.addEventListener("abort", () => child.kill(), { once: true });
+  });
+}
+
+/**
+ * One-time migration: older versions stored the API key in a workspace file
+ * (plugins-data/youtube-manager/credentials.json). Workspace files leak into
+ * backups/sync, so if that file exists, move the key into the encrypted
+ * credential vault and delete the file.
+ */
+async function migrateLegacyKeyFile(ctx: ToolContext): Promise<void> {
+  const legacyPath = path.join(storageDir(ctx.workingDir), "credentials.json");
+  let raw: string;
+  try {
+    raw = await fs.readFile(legacyPath, "utf8");
+  } catch {
+    return; // no legacy file — nothing to do
+  }
+  try {
+    const key = (JSON.parse(raw) as { apiKey?: string }).apiKey?.trim();
+    if (key) {
+      await credentialsCli(
+        ["set", "--service", CRED_SERVICE, "--field", CRED_FIELD, key],
+        ctx,
+      );
+    }
+    await fs.unlink(legacyPath);
+  } catch {
+    // Vault write failed — leave the file so the user's key isn't lost;
+    // resolveApiKey will surface NO_AUTH_MSG with vault instructions.
+  }
+}
 
 async function resolveApiKey(ctx: ToolContext): Promise<string | null> {
   const envKey = process.env.YOUTUBE_API_KEY?.trim();
   if (envKey) return envKey;
-  const creds = await readJson<{ apiKey?: string }>(ctx.workingDir, "credentials.json", {});
-  return creds.apiKey?.trim() || null;
+  await migrateLegacyKeyFile(ctx);
+  try {
+    const key = await credentialsCli(
+      ["reveal", "--service", CRED_SERVICE, "--field", CRED_FIELD],
+      ctx,
+    );
+    return key || null;
+  } catch {
+    return null; // not stored (or CLI unavailable)
+  }
 }
 
 // ---------------------------------------------------------------------------

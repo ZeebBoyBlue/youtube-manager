@@ -47,8 +47,12 @@ A YouTube Data API v3 key (free, 10,000 quota units/day):
    **YouTube Data API v3** → Credentials → Create API key.
 2. Provide it one of two ways:
    - `YOUTUBE_API_KEY` environment variable, or
-   - `<workspace>/plugins-data/youtube-manager/credentials.json` containing
-     `{"apiKey": "..."}`.
+   - the encrypted credential vault:
+     `assistant credentials prompt --service youtube --field api_key`
+
+API keys are never stored in the workspace (workspace files end up in
+backups/sync). A legacy `plugins-data/youtube-manager/credentials.json` from
+older versions is migrated into the vault automatically and deleted.
 
 The client checks OAuth first and falls back to the API key, so shipping both
 is fine.
@@ -62,4 +66,5 @@ in this version.
 ## Data
 
 Runtime state lives in `<workspace>/plugins-data/youtube-manager/`:
-`credentials.json` (API key) and `watchlist.json` (tracked channels).
+`watchlist.json` (tracked channels). No secrets are stored there — the API
+key lives in the encrypted credential vault.

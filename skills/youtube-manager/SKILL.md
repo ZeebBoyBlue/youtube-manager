@@ -33,10 +33,11 @@ path: check current Google scopes with `assistant oauth providers get google`
 and `assistant oauth status google`, then reconnect with the existing scopes
 plus `https://www.googleapis.com/auth/youtube.readonly`. Show the user an
 `oauth_connect`-style CTA or the connect URL — never make them paste secrets
-in chat. Fallback: an API key in `YOUTUBE_API_KEY` or
-`plugins-data/youtube-manager/credentials.json` (`{"apiKey": "..."}`), created
-in Google Cloud Console with YouTube Data API v3 enabled. Never echo keys back
-into the conversation.
+in chat. Fallback: an API key created in Google Cloud Console with YouTube Data API
+v3 enabled, provided via `YOUTUBE_API_KEY` or stored in the encrypted vault
+with `assistant credentials prompt --service youtube --field api_key` (the
+prompt flow collects it through a secure UI). Never store keys in workspace
+files and never echo keys back into the conversation.
 
 ## Workflows
 

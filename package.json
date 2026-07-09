@@ -1,10 +1,9 @@
 {
-  "name": "youtube-manager",
-  "version": "0.1.0",
+  "name": "@vellum-ai/youtube-manager",
+  "version": "0.1.1",
   "description": "YouTube manager for your assistant: search, video and channel analytics, comment mining, trending research, and a persistent channel watchlist with digests. Powered by the YouTube Data API v3.",
   "peerDependencies": {
     "@vellumai/plugin-api": "^0.10.0"
   },
-  "vellum": {},
-  "license": "MIT"
+  "vellum": {}
 }
